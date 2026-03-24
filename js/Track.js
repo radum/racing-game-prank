@@ -421,14 +421,17 @@ export function computeSpawnPosition( cells ) {
 
 	}
 
-	if ( ! cell ) return [ 3.5, 0.5, 5 ];
+	if ( ! cell ) return { position: [ 3.5, 0.5, 5 ], angle: 0 };
 
 	const gx = cell[ 0 ];
 	const gz = cell[ 1 ];
 	const x = ( gx + 0.5 ) * CELL_RAW * GRID_SCALE;
 	const z = ( gz + 0.5 ) * CELL_RAW * GRID_SCALE;
 
-	return [ x, 0.5, z ];
+	const orient = cell[ 3 ];
+	const angle = THREE.MathUtils.degToRad( ORIENT_DEG[ orient ] || 0 );
+
+	return { position: [ x, 0.5, z ], angle };
 
 }
 

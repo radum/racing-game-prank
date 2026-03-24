@@ -145,6 +145,8 @@
 	// Bitmask: N=8 S=4 E=2 W=1
 	// Corner connectivity: 0°=S+W, 90°=S+E, 180°=N+E, 270°=N+W
 
+	const ORIENT_FLIP = { 0: 10, 10: 0, 16: 22, 22: 16 };
+
 	const AUTOTILE = [
 		[ 'track-straight', 0 ],    //  0: isolated
 		[ 'track-straight', 16 ],   //  1: W
@@ -458,6 +460,32 @@
 
 	}
 
+	function placeMesh( gx, gz, cell ) {
+
+		if ( cell.mesh ) trackGroup.remove( cell.mesh );
+
+		const src = models[ cell.type ];
+		if ( ! src ) return;
+
+		const mesh = src.clone();
+		mesh.position.set( ( gx + 0.5 ) * CELL_RAW, 0.5, ( gz + 0.5 ) * CELL_RAW );
+		mesh.rotation.y = THREE.MathUtils.degToRad( ORIENT_DEG[ cell.orient ] || 0 );
+		mesh.traverse( ( c ) => {
+
+			if ( c.isMesh ) {
+
+				c.castShadow = true;
+				c.receiveShadow = true;
+
+			}
+
+		} );
+
+		trackGroup.add( mesh );
+		cell.mesh = mesh;
+
+	}
+
 	function resolveCell( gx, gz ) {
 
 		const key = cellKey( gx, gz );
@@ -497,35 +525,7 @@
 		cell.type = type;
 		cell.orient = orient;
 
-		// Update 3D mesh
-		if ( cell.mesh ) {
-
-			trackGroup.remove( cell.mesh );
-
-		}
-
-		const src = models[ type ];
-		if ( ! src ) return;
-
-		const mesh = src.clone();
-		mesh.position.set( ( gx + 0.5 ) * CELL_RAW, 0.5, ( gz + 0.5 ) * CELL_RAW );
-
-		const deg = ORIENT_DEG[ orient ] || 0;
-		mesh.rotation.y = THREE.MathUtils.degToRad( deg );
-
-		mesh.traverse( ( c ) => {
-
-			if ( c.isMesh ) {
-
-				c.castShadow = true;
-				c.receiveShadow = true;
-
-			}
-
-		} );
-
-		trackGroup.add( mesh );
-		cell.mesh = mesh;
+		placeMesh( gx, gz, cell );
 
 	}
 
@@ -570,6 +570,13 @@
 
 				cell.isFinish = true;
 				resolveCellAndNeighbors( gx, gz );
+				save();
+
+			} else if ( cell.isFinish ) {
+
+				// Click on finish tile → flip direction (rotate 180°)
+				cell.orient = ORIENT_FLIP[ cell.orient ] ?? cell.orient;
+				placeMesh( gx, gz, cell );
 				save();
 
 			}
@@ -794,26 +801,9 @@
 			for ( const [ gx, gz, type, orient ] of arr ) {
 
 				const isFinish = ( type === 'track-finish' );
-
-				const src = models[ type ];
-				if ( ! src ) continue;
-
-				const mesh = src.clone();
-				mesh.position.set( ( gx + 0.5 ) * CELL_RAW, 0.5, ( gz + 0.5 ) * CELL_RAW );
-				mesh.rotation.y = THREE.MathUtils.degToRad( ORIENT_DEG[ orient ] || 0 );
-				mesh.traverse( ( c ) => {
-
-					if ( c.isMesh ) {
-
-						c.castShadow = true;
-						c.receiveShadow = true;
-
-					}
-
-				} );
-
-				trackGroup.add( mesh );
-				grid.set( cellKey( gx, gz ), { type, orient, isFinish, mesh } );
+				const cell = { type, orient, isFinish, mesh: null };
+				grid.set( cellKey( gx, gz ), cell );
+				placeMesh( gx, gz, cell );
 
 			}
 

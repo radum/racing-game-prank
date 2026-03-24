@@ -105,14 +105,14 @@ async function init() {
 
 	const mapParam = new URLSearchParams( window.location.search ).get( 'map' );
 	let customCells = null;
-	let spawnPos = null;
+	let spawn = null;
 
 	if ( mapParam ) {
 
 		try {
 
 			customCells = decodeCells( mapParam );
-			spawnPos = computeSpawnPosition( customCells );
+			spawn = computeSpawnPosition( customCells );
 
 		} catch ( e ) {
 
@@ -168,16 +168,18 @@ async function init() {
 		restitution: 0.0,
 	} );
 
-	const sphereBody = createSphereBody( world, spawnPos );
+	const sphereBody = createSphereBody( world, spawn ? spawn.position : null );
 
 	const vehicle = new Vehicle();
 	vehicle.rigidBody = sphereBody;
 	vehicle.physicsWorld = world;
 
-	if ( spawnPos ) {
+	if ( spawn ) {
 
-		vehicle.spherePos.set( spawnPos[ 0 ], spawnPos[ 1 ], spawnPos[ 2 ] );
-		vehicle.prevModelPos.set( spawnPos[ 0 ], 0, spawnPos[ 2 ] );
+		const [ sx, sy, sz ] = spawn.position;
+		vehicle.spherePos.set( sx, sy, sz );
+		vehicle.prevModelPos.set( sx, 0, sz );
+		vehicle.container.rotation.y = spawn.angle;
 
 	}
 
