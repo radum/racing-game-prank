@@ -211,7 +211,7 @@ async function init() {
 	const contactListener = {
 		onContactAdded( bodyA, bodyB ) {
 
-			// Vehicle impacts (audio + speedboat explosion)
+			// Vehicle impacts (audio)
 			if ( bodyA === sphereBody || bodyB === sphereBody ) {
 
 				_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
@@ -221,9 +221,10 @@ async function init() {
 				const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
 				audio.playImpact( impactVelocity );
 
-				speedBoat.onContact( bodyA, bodyB );
-
 			}
+
+			// Speedboat explosion (vehicle or projectile contact)
+			speedBoat.onContact( bodyA, bodyB );
 
 			// Powerup projectile impacts
 			powerups.onContact( bodyA, bodyB );
