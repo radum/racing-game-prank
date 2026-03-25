@@ -21,6 +21,7 @@ function createPlayerEntry( id, index ) {
 	return {
 		id,
 		index,
+		name: '',
 		vehicle: null,
 		sphereBody: null,
 		alive: true,
@@ -51,12 +52,13 @@ export class PlayerManager {
 
 	// --- Add a player --------------------------------------------------------
 
-	addPlayer( playerId, spawnPosition, spawnAngle ) {
+	addPlayer( playerId, spawnPosition, spawnAngle, playerName ) {
 
 		if ( this.players.has( playerId ) ) return this.players.get( playerId );
 
 		const index = this.playerOrder.length;
 		const entry = createPlayerEntry( playerId, index );
+		entry.name = playerName || ( 'Player ' + ( index + 1 ) );
 		entry.spawnPosition = spawnPosition;
 		entry.spawnAngle = spawnAngle;
 
@@ -81,7 +83,7 @@ export class PlayerManager {
 		this._tintVehicle( vehicleGroup, index );
 
 		// Add a name tag sprite above the vehicle
-		this._addNameTag( entry.vehicle, index );
+		this._addNameTag( entry.vehicle, index, entry.name );
 
 		this.scene.add( vehicleGroup );
 
@@ -414,7 +416,7 @@ export class PlayerManager {
 
 	// --- Add a floating name tag above the vehicle ---------------------------
 
-	_addNameTag( vehicle, playerIndex ) {
+	_addNameTag( vehicle, playerIndex, playerName ) {
 
 		const canvas = document.createElement( 'canvas' );
 		canvas.width = 256;
@@ -422,7 +424,7 @@ export class PlayerManager {
 
 		const ctx = canvas.getContext( '2d' );
 		const color = PLAYER_COLORS[ playerIndex ] || '#ffffff';
-		const name = 'Player ' + ( playerIndex + 1 );
+		const name = playerName || ( 'Player ' + ( playerIndex + 1 ) );
 
 		ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
 		ctx.beginPath();
@@ -465,6 +467,7 @@ export class PlayerManager {
 
 			data.push( {
 				id: playerId,
+				name: entry.name,
 				alive: entry.alive,
 				respawnTimer: entry.respawnTimer,
 				powerup: entry.powerup,

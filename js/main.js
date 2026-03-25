@@ -310,7 +310,8 @@ function initMultiplayer( network, isHost, playerList, customCells ) {
 
 		const pid = playerList[ i ];
 		const sp = spawns[ i ] || spawns[ 0 ];
-		playerManager.addPlayer( pid, sp.position, sp.angle );
+		const name = network.getPlayerName( pid );
+		playerManager.addPlayer( pid, sp.position, sp.angle, name );
 
 	}
 
@@ -431,7 +432,8 @@ function initMultiplayer( network, isHost, playerList, customCells ) {
 				const count = playerManager.playerOrder.length + 1;
 				const spawns = computeSpawnPositions( customCells, count );
 				const sp = spawns[ spawns.length - 1 ] || spawns[ 0 ];
-				playerManager.addPlayer( playerId, sp.position, sp.angle );
+				const name = network.getPlayerName( playerId );
+				playerManager.addPlayer( playerId, sp.position, sp.angle, name );
 
 			}
 

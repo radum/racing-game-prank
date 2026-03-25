@@ -92,6 +92,34 @@ const LOBBY_CSS = `
 		font-size: 14px;
 		opacity: 0.4;
 	}
+	.lobby-name-input {
+		width: 100%;
+		padding: 12px;
+		border: 2px solid #444;
+		border-radius: 10px;
+		background: #0f0f23;
+		color: #fff;
+		font-size: 16px;
+		font-weight: 600;
+		text-align: center;
+		margin-bottom: 16px;
+		box-sizing: border-box;
+		outline: none;
+		letter-spacing: normal;
+		text-transform: none;
+	}
+	.lobby-name-input:focus { border-color: #4488ff; }
+	.lobby-name-input::placeholder {
+		font-size: 14px;
+		opacity: 0.4;
+		font-weight: normal;
+	}
+	.lobby-name-label {
+		font-size: 12px;
+		text-transform: uppercase;
+		opacity: 0.5;
+		margin-bottom: 6px;
+	}
 	.lobby-room-code {
 		font-size: 48px;
 		font-weight: bold;
@@ -170,6 +198,19 @@ export class Lobby {
 		this.panel = null;
 		this._resolve = null;
 		this._network = null;
+		this._localName = '';
+
+	}
+
+	_defaultName() {
+
+		return 'Player ' + ( 1 + Math.floor( Math.random() * 999 ) );
+
+	}
+
+	_escapeHtml( str ) {
+
+		return str.replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' ).replace( /"/g, '&quot;' );
 
 	}
 
@@ -226,19 +267,46 @@ export class Lobby {
 		panel.innerHTML = `
 			<div class="lobby-title">Beyond Zero Racing</div>
 			<div class="lobby-subtitle">Multiplayer Arena</div>
+			<div class="lobby-name-label">Your Name</div>
+			<input class="lobby-name-input" id="lobby-name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" spellcheck="false" value="${ this._escapeHtml( this._localName ) }">
 			<button class="lobby-btn lobby-btn-primary" id="lobby-host">Host Game</button>
 			<button class="lobby-btn lobby-btn-secondary" id="lobby-join">Join Game</button>
 			<button class="lobby-btn lobby-btn-solo" id="lobby-solo">Play Solo</button>
 		`;
 
-		panel.querySelector( '#lobby-host' ).onclick = () => this._showHostScreen();
-		panel.querySelector( '#lobby-join' ).onclick = () => this._showJoinScreen();
+		const nameInput = panel.querySelector( '#lobby-name' );
+
+		const readName = () => {
+
+			const raw = nameInput.value.trim();
+			this._localName = raw || this._defaultName();
+			this._network.localName = this._localName;
+
+		};
+
+		panel.querySelector( '#lobby-host' ).onclick = () => {
+
+			readName();
+			this._showHostScreen();
+
+		};
+
+		panel.querySelector( '#lobby-join' ).onclick = () => {
+
+			readName();
+			this._showJoinScreen();
+
+		};
+
 		panel.querySelector( '#lobby-solo' ).onclick = () => {
 
 			this.destroy();
 			this._resolve( { mode: 'singleplayer' } );
 
 		};
+
+		nameInput.focus();
+		nameInput.select();
 
 	}
 
@@ -281,7 +349,7 @@ export class Lobby {
 			const playerListHTML = players.map( ( pid, i ) => {
 
 				const color = PLAYER_COLORS[ i ] || '#888';
-				const name = PLAYER_NAMES[ i ] || ( 'Player ' + ( i + 1 ) );
+				const name = this._escapeHtml( this._network.getPlayerName( pid ) );
 				const you = pid === this._network.localId ? '<span class="lobby-player-you">(you)</span>' : '';
 				return `<li><span class="lobby-player-dot" style="background:${ color }"></span>${ name }${ you }</li>`;
 
@@ -428,7 +496,7 @@ export class Lobby {
 			const playerListHTML = players.map( ( pid, i ) => {
 
 				const color = PLAYER_COLORS[ i ] || '#888';
-				const name = PLAYER_NAMES[ i ] || ( 'Player ' + ( i + 1 ) );
+				const name = this._escapeHtml( this._network.getPlayerName( pid ) );
 				const you = pid === this._network.localId ? '<span class="lobby-player-you">(you)</span>' : '';
 				return `<li><span class="lobby-player-dot" style="background:${ color }"></span>${ name }${ you }</li>`;
 
@@ -502,7 +570,7 @@ export class Lobby {
 
 			const p = players[ i ];
 			const color = PLAYER_COLORS[ i ] || '#888';
-			const name = PLAYER_NAMES[ i ] || ( 'Player ' + ( i + 1 ) );
+			const name = p.name || ( 'Player ' + ( i + 1 ) );
 			const status = p.alive ? '' : '<span style="color:#ff4444;font-size:11px;margin-left:6px">DESTROYED</span>';
 			const respawn = ( ! p.alive && p.respawnTimer > 0 )
 				? '<span style="color:#ffaa00;font-size:11px;margin-left:4px">' + Math.ceil( p.respawnTimer ) + 's</span>'

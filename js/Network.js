@@ -14,6 +14,7 @@ const STATE_SEND_RATE = 50; // ms between host state broadcasts (~20 Hz)
 export const MSG = {
 	// Client -> Host
 	INPUT: 'input',
+	HELLO: 'hello',
 	// Host -> Client
 	STATE: 'state',
 	PLAYER_JOINED: 'player_joined',
@@ -53,6 +54,10 @@ export class Network {
 		this.isHost = false;
 		this.roomCode = '';
 		this.localId = '';
+		this.localName = '';
+
+		// Player names: playerId -> display name
+		this.playerNames = new Map();
 
 		// Host-only: connections keyed by peerId
 		this.connections = new Map();
@@ -190,6 +195,7 @@ export class Network {
 
 				this.localId = 'player0';
 				this.peerToPlayer.set( id, this.localId );
+				this.playerNames.set( this.localId, this.localName || 'Host' );
 				resolve( this.roomCode );
 
 			} );
@@ -238,6 +244,9 @@ export class Network {
 
 					this.hostConnection = conn;
 
+					// Send our name to the host
+					conn.send( { type: MSG.HELLO, name: this.localName || 'Player' } );
+
 					conn.on( 'data', ( data ) => {
 
 						this._handleClientMessage( data );
@@ -281,40 +290,65 @@ export class Network {
 
 		conn.on( 'open', () => {
 
-			const playerId = 'player' + this._nextPlayerId;
-			this._nextPlayerId ++;
-
-			this.connections.set( conn.peer, conn );
-			this.peerToPlayer.set( conn.peer, playerId );
-
-			// Tell the new client their player ID and current player list
-			const players = [ this.localId ];
-			for ( const [ , pid ] of this.peerToPlayer ) {
-
-				if ( pid !== this.localId && pid !== playerId ) players.push( pid );
-
-			}
-
-			players.push( playerId );
-
-			conn.send( {
-				type: MSG.PLAYER_JOINED,
-				playerId,
-				players,
-			} );
-
-			// Tell existing clients about the new player
-			this._broadcastExcept( conn.peer, {
-				type: MSG.PLAYER_JOINED,
-				playerId,
-				players,
-			} );
-
-			this._fireCallback( 'onPlayerJoined', playerId );
+			// Wait for the client to send HELLO with their name before
+			// assigning a playerId and announcing them to the lobby.
+			let registered = false;
 
 			conn.on( 'data', ( data ) => {
 
-				this._handleHostMessage( conn.peer, data );
+				if ( ! registered && data.type === MSG.HELLO ) {
+
+					registered = true;
+					const clientName = data.name || 'Player';
+
+					const playerId = 'player' + this._nextPlayerId;
+					this._nextPlayerId ++;
+
+					this.connections.set( conn.peer, conn );
+					this.peerToPlayer.set( conn.peer, playerId );
+					this.playerNames.set( playerId, clientName );
+
+					// Build current player list and names map
+					const players = [ this.localId ];
+					const names = {};
+					names[ this.localId ] = this.playerNames.get( this.localId );
+
+					for ( const [ , pid ] of this.peerToPlayer ) {
+
+						if ( pid !== this.localId && pid !== playerId ) {
+
+							players.push( pid );
+							names[ pid ] = this.playerNames.get( pid );
+
+						}
+
+					}
+
+					players.push( playerId );
+					names[ playerId ] = clientName;
+
+					conn.send( {
+						type: MSG.PLAYER_JOINED,
+						playerId,
+						players,
+						names,
+					} );
+
+					// Tell existing clients about the new player
+					this._broadcastExcept( conn.peer, {
+						type: MSG.PLAYER_JOINED,
+						playerId,
+						players,
+						names,
+					} );
+
+					this._fireCallback( 'onPlayerJoined', playerId );
+
+				} else if ( registered ) {
+
+					this._handleHostMessage( conn.peer, data );
+
+				}
 
 			} );
 
@@ -323,6 +357,8 @@ export class Network {
 				const pid = this.peerToPlayer.get( conn.peer );
 				this.connections.delete( conn.peer );
 				this.peerToPlayer.delete( conn.peer );
+
+				if ( pid ) this.playerNames.delete( pid );
 
 				this._broadcast( {
 					type: MSG.PLAYER_LEFT,
@@ -359,6 +395,16 @@ export class Network {
 
 			case MSG.PLAYER_JOINED:
 				this.localId = this.localId || data.playerId;
+				if ( data.names ) {
+
+					for ( const pid in data.names ) {
+
+						this.playerNames.set( pid, data.names[ pid ] );
+
+					}
+
+				}
+
 				this._fireCallback( 'onPlayerJoined', data.playerId, data.players );
 				break;
 
@@ -371,6 +417,16 @@ export class Network {
 				break;
 
 			case MSG.GAME_START:
+				if ( data.names ) {
+
+					for ( const pid in data.names ) {
+
+						this.playerNames.set( pid, data.names[ pid ] );
+
+					}
+
+				}
+
 				this._fireCallback( 'onGameStart', data );
 				break;
 
@@ -432,9 +488,18 @@ export class Network {
 
 		}
 
+		const names = {};
+
+		for ( const pid of players ) {
+
+			names[ pid ] = this.playerNames.get( pid ) || pid;
+
+		}
+
 		const data = {
 			type: MSG.GAME_START,
 			players,
+			names,
 			mapParam: mapParam || null,
 		};
 
@@ -545,6 +610,14 @@ export class Network {
 		}
 
 		return [];
+
+	}
+
+	// --- Get display name for a player ---------------------------------------
+
+	getPlayerName( playerId ) {
+
+		return this.playerNames.get( playerId ) || playerId;
 
 	}
 
