@@ -47,9 +47,22 @@ function createLabelSprite( text ) {
 	ctx.fill();
 
 	ctx.fillStyle = '#ffffff';
-	ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif';
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
+
+	// Shrink font until the text fits within the padded area
+	const maxWidth = 472;
+	let fontSize = 64;
+
+	ctx.font = 'bold ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+
+	while ( ctx.measureText( text ).width > maxWidth && fontSize > 16 ) {
+
+		fontSize -= 2;
+		ctx.font = 'bold ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+
+	}
+
 	ctx.fillText( text, 256, 64 );
 
 	const texture = new THREE.CanvasTexture( canvas );
