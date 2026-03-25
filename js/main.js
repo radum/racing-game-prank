@@ -543,6 +543,15 @@ async function init() {
 	registerAll();
 	await loadModels();
 
+	// Remove loading screen
+	const loadingScreen = document.getElementById( 'loading-screen' );
+
+	if ( loadingScreen ) {
+
+		setTimeout( () => { loadingScreen.classList.add( 'fade-out' ); loadingScreen.remove(); }, 4000 );
+
+	}
+
 	const { customCells, spawn, mapParam } = parseMapParam();
 
 	const network = new Network();
