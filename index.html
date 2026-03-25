@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-	<title>Racing</title>
+	<title>Beyond Zero Racing 🏎️</title>
 	<style>
-		body { margin: 0; overflow: hidden; background: #000; }
-		canvas { display: block; touch-action: none; }
+		body {
+			margin: 0;
+			overflow: hidden;
+			background: #000;
+		}
+
+		canvas {
+			display: block;
+			touch-action: none;
+		}
+
 		#editor-link {
 			position: absolute;
 			bottom: 12px;
@@ -14,14 +24,22 @@
 			color: #fff;
 			font: 14px sans-serif;
 			text-decoration: none;
-			background: rgba(0,0,0,0.5);
+			background: rgba(0, 0, 0, 0.5);
 			padding: 8px 14px;
 			border-radius: 6px;
 			z-index: 10;
 		}
-		#editor-link:hover { background: rgba(0,0,0,0.7); }
+
+		#editor-link:hover {
+			background: rgba(0, 0, 0, 0.7);
+		}
+
 		@media (pointer: coarse) {
-			#editor-link { bottom: auto; top: 12px; right: 12px; }
+			#editor-link {
+				bottom: auto;
+				top: 12px;
+				right: 12px;
+			}
 		}
 	</style>
 	<script type="importmap">
@@ -33,17 +51,29 @@
 		}
 	}
 	</script>
+
+	<!-- Google tag (gtag.js) -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-HFNWYTFJRY"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag() { dataLayer.push(arguments); }
+		gtag('js', new Date());
+
+		gtag('config', 'G-HFNWYTFJRY');
+	</script>
 </head>
+
 <body>
 	<a id="editor-link" href="editor.html">Create your own track</a>
 	<script>
-		const map = new URLSearchParams( location.search ).get( 'map' );
-		if ( map ) {
-			const link = document.getElementById( 'editor-link' );
+		const map = new URLSearchParams(location.search).get('map');
+		if (map) {
+			const link = document.getElementById('editor-link');
 			link.href = 'editor.html?map=' + map;
 			link.textContent = 'Edit this track';
 		}
 	</script>
 	<script type="module" src="js/main.js"></script>
 </body>
+
 </html>
