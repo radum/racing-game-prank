@@ -89,7 +89,11 @@ export class Powerups {
 		this.pickups = [];
 		this.pickupTimer = PICKUP_SPAWN_INTERVAL;
 
+		// Singleplayer powerup (used when playerManager is null)
 		this.currentPowerup = null;
+
+		// Multiplayer per-player powerup inventory
+		this.playerPowerups = new Map();
 
 		this.missiles = [];
 		this.bombs = [];
@@ -101,6 +105,12 @@ export class Powerups {
 		// References set by main.js so projectiles can trigger target destruction
 		this.boxWall = null;
 		this.speedBoat = null;
+
+		// Multiplayer: set by main.js to enable vehicle-as-target and multi-vehicle pickup
+		this.playerManager = null;
+		this.localPlayerId = null;
+		this.isHost = false;
+		this.network = null;
 
 	}
 
@@ -122,12 +132,138 @@ export class Powerups {
 		this.updateShockwaves( dt );
 		this.updateExplosions( dt );
 
-		// Fire powerup
-		if ( input.fire && this.currentPowerup ) {
+		// Singleplayer fire
+		if ( ! this.playerManager && input.fire && this.currentPowerup ) {
 
 			this.fire( vehicle );
 
 		}
+
+	}
+
+	// --- Multiplayer: update with PlayerManager ------------------------------
+
+	updateMultiplayer( dt ) {
+
+		this.pickupTimer -= dt;
+
+		if ( this.pickupTimer <= 0 ) {
+
+			this.pickupTimer = PICKUP_SPAWN_INTERVAL;
+
+			if ( this.pickups.length < MAX_PICKUPS ) this.spawnPickup();
+
+		}
+
+		this.updatePickupsMultiplayer( dt );
+		this.updateMissiles( dt );
+		this.updateBombs( dt );
+		this.updateShockwaves( dt );
+		this.updateExplosions( dt );
+
+		// Fire powerups for each player that has fire input
+		if ( this.playerManager ) {
+
+			for ( const [ playerId, entry ] of this.playerManager.players ) {
+
+				if ( ! entry.alive ) continue;
+
+				if ( entry.input.fire && this.playerPowerups.has( playerId ) ) {
+
+					this.fireForPlayer( playerId, entry.vehicle );
+
+				}
+
+			}
+
+		}
+
+	}
+
+	updatePickupsMultiplayer( dt ) {
+
+		if ( ! this.playerManager ) return;
+
+		for ( let i = this.pickups.length - 1; i >= 0; i -- ) {
+
+			const p = this.pickups[ i ];
+
+			// Rotate and bob
+			p.angle += dt * 3;
+			p.mesh.rotation.y += dt * 2;
+			p.mesh.position.y = 0.5 + Math.sin( p.angle ) * 0.15;
+
+			// Check collection by any alive vehicle
+			let collected = false;
+
+			for ( const [ playerId, entry ] of this.playerManager.players ) {
+
+				if ( ! entry.alive ) continue;
+
+				const dx = entry.vehicle.spherePos.x - p.x;
+				const dz = entry.vehicle.spherePos.z - p.z;
+				const distSq = dx * dx + dz * dz;
+
+				if ( distSq < PICKUP_COLLECT_DIST_SQ ) {
+
+					// Only assign if player has no powerup
+					if ( ! this.playerPowerups.has( playerId ) ) {
+
+						const type = POWERUP_TYPES[ Math.floor( Math.random() * POWERUP_TYPES.length ) ];
+						this.playerPowerups.set( playerId, type );
+
+						// Update HUD only for local player
+						if ( playerId === this.localPlayerId ) {
+
+							this.currentPowerup = type;
+							this.updateHUD();
+
+						}
+
+					}
+
+					collected = true;
+					break;
+
+				}
+
+			}
+
+			if ( collected ) {
+
+				this.scene.remove( p.mesh );
+				p.mesh.material.dispose();
+				this.pickups.splice( i, 1 );
+
+			}
+
+		}
+
+	}
+
+	fireForPlayer( playerId, vehicle ) {
+
+		const type = this.playerPowerups.get( playerId );
+		if ( ! type ) return;
+
+		this.playerPowerups.delete( playerId );
+
+		// Update HUD for local player
+		if ( playerId === this.localPlayerId ) {
+
+			this.currentPowerup = null;
+			this.updateHUD();
+
+		}
+
+		const pos = vehicle.spherePos;
+		_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+		_forward.y = 0;
+		_forward.normalize();
+
+		if ( type === 'missile' ) this.fireMissile( pos, _forward );
+		if ( type === 'shockwave' ) this.fireShockwave( pos );
+		if ( type === 'bomb' ) this.fireBomb( pos, _forward );
 
 	}
 
@@ -141,6 +277,27 @@ export class Powerups {
 			if ( m.dead ) continue;
 
 			if ( bodyA === m.body || bodyB === m.body ) {
+
+				// In multiplayer, check if the other body is a player sphere and destroy them
+				if ( this.playerManager && this.isHost ) {
+
+					const other = bodyA === m.body ? bodyB : bodyA;
+					const bodyMap = this.playerManager.getAllSphereBodies();
+					const hitPlayerId = bodyMap.get( other );
+
+					if ( hitPlayerId ) {
+
+						const entry = this.playerManager.getPlayer( hitPlayerId );
+						if ( entry && entry.alive && entry.invincibleTimer <= 0 ) {
+
+							this.playerManager.destroyPlayer( hitPlayerId );
+							if ( this.network ) this.network.sendPlayerDestroyed( hitPlayerId );
+
+						}
+
+					}
+
+				}
 
 				m.dead = true;
 
@@ -157,8 +314,29 @@ export class Powerups {
 
 				b.bounces ++;
 
-				// Explode on contact with target bodies, or after max bounces
 				const other = bodyA === b.body ? bodyB : bodyA;
+
+				// In multiplayer, check if the other body is a player sphere and destroy them
+				if ( this.playerManager && this.isHost ) {
+
+					const bodyMap = this.playerManager.getAllSphereBodies();
+					const hitPlayerId = bodyMap.get( other );
+
+					if ( hitPlayerId ) {
+
+						const entry = this.playerManager.getPlayer( hitPlayerId );
+						if ( entry && entry.alive && entry.invincibleTimer <= 0 ) {
+
+							this.playerManager.destroyPlayer( hitPlayerId );
+							if ( this.network ) this.network.sendPlayerDestroyed( hitPlayerId );
+
+						}
+
+					}
+
+				}
+
+				// Explode on contact with target bodies, or after max bounces
 				const isTarget = this.isTargetBody( other );
 
 				if ( isTarget || b.bounces >= BOMB_MAX_BOUNCES ) {
@@ -550,6 +728,14 @@ export class Powerups {
 
 		}
 
+		// Check if body belongs to a player vehicle sphere
+		if ( this.playerManager ) {
+
+			const bodyMap = this.playerManager.getAllSphereBodies();
+			if ( bodyMap.has( body ) ) return true;
+
+		}
+
 		return false;
 
 	}
@@ -612,6 +798,45 @@ export class Powerups {
 			if ( distSq < radiusSq ) {
 
 				this.speedBoat.explode();
+
+			}
+
+		}
+
+		// Blast player vehicles (multiplayer, host-only)
+		if ( this.playerManager && this.isHost ) {
+
+			for ( const [ playerId, entry ] of this.playerManager.players ) {
+
+				if ( ! entry.alive ) continue;
+				if ( entry.invincibleTimer > 0 ) continue;
+
+				const vx = entry.vehicle.spherePos.x;
+				const vz = entry.vehicle.spherePos.z;
+				const dx = vx - x;
+				const dz = vz - z;
+				const distSq = dx * dx + dz * dz;
+
+				if ( distSq < radiusSq ) {
+
+					// Apply knockback force to the vehicle sphere
+					const dist = Math.sqrt( distSq ) + 0.1;
+					const force = SHOCKWAVE_FORCE * ( 1 - dist / radius );
+					const dirX = dx / dist;
+					const dirZ = dz / dist;
+
+					const vel = entry.sphereBody.motionProperties.linearVelocity;
+					rigidBody.setLinearVelocity( this.world, entry.sphereBody, [
+						vel[ 0 ] + dirX * force,
+						vel[ 1 ] + force * 0.8,
+						vel[ 2 ] + dirZ * force,
+					] );
+
+					// Destroy the player
+					this.playerManager.destroyPlayer( playerId );
+					if ( this.network ) this.network.sendPlayerDestroyed( playerId );
+
+				}
 
 			}
 

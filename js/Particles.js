@@ -39,15 +39,22 @@ export class SmokeTrails {
 
 	}
 
-	update( dt, vehicle ) {
+	update( dt, vehicleOrArray ) {
 
-		const shouldEmit = vehicle.driftIntensity > 0.25;
+		// Support both a single vehicle and an array of vehicles
+		const vehicles = Array.isArray( vehicleOrArray ) ? vehicleOrArray : [ vehicleOrArray ];
 
-		// Emit new particles from back wheel positions
-		if ( shouldEmit ) {
+		for ( const vehicle of vehicles ) {
 
-			if ( vehicle.wheelBL ) this.emitAtWheel( vehicle.wheelBL, vehicle );
-			if ( vehicle.wheelBR ) this.emitAtWheel( vehicle.wheelBR, vehicle );
+			const shouldEmit = vehicle.driftIntensity > 0.25;
+
+			// Emit new particles from back wheel positions
+			if ( shouldEmit ) {
+
+				if ( vehicle.wheelBL ) this.emitAtWheel( vehicle.wheelBL, vehicle );
+				if ( vehicle.wheelBR ) this.emitAtWheel( vehicle.wheelBR, vehicle );
+
+			}
 
 		}
 

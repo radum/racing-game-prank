@@ -5,13 +5,16 @@ import { createWorldSettings, createWorld, addBroadphaseLayer, addObjectLayer, e
 import { Vehicle } from './Vehicle.js';
 import { Camera } from './Camera.js';
 import { Controls } from './Controls.js';
-import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } from './Track.js';
+import { buildTrack, decodeCells, computeSpawnPosition, computeSpawnPositions, computeTrackBounds } from './Track.js';
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { GameAudio } from './Audio.js';
 import { BoxWall } from './BoxWall.js';
 import { SpeedBoat } from './SpeedBoat.js';
 import { Powerups } from './Powerups.js';
+import { Network } from './Network.js';
+import { Lobby } from './Lobby.js';
+import { PlayerManager } from './PlayerManager.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -99,31 +102,10 @@ async function loadModels() {
 
 }
 
-async function init() {
+// --- Shared scene setup --------------------------------------------------
 
-	registerAll();
-	await loadModels();
+function setupScene( customCells ) {
 
-	const mapParam = new URLSearchParams( window.location.search ).get( 'map' );
-	let customCells = null;
-	let spawn = null;
-
-	if ( mapParam ) {
-
-		try {
-
-			customCells = decodeCells( mapParam );
-			spawn = computeSpawnPosition( customCells );
-
-		} catch ( e ) {
-
-			console.warn( 'Invalid map parameter, using default track' );
-
-		}
-
-	}
-
-	// Compute track bounds and size physics/shadows to fit
 	const bounds = computeTrackBounds( customCells );
 	const hw = bounds.halfWidth;
 	const hd = bounds.halfDepth;
@@ -141,6 +123,11 @@ async function init() {
 
 	buildTrack( scene, models, customCells );
 
+	return { bounds, groundSize };
+
+}
+
+function setupPhysics( bounds, groundSize, customCells ) {
 
 	const worldSettings = createWorldSettings();
 	worldSettings.gravity = [ 0, - 9.81, 0 ];
@@ -169,6 +156,44 @@ async function init() {
 		restitution: 0.0,
 	} );
 
+	return world;
+
+}
+
+// --- Parse map parameter -------------------------------------------------
+
+function parseMapParam() {
+
+	const mapParam = new URLSearchParams( window.location.search ).get( 'map' );
+	let customCells = null;
+	let spawn = null;
+
+	if ( mapParam ) {
+
+		try {
+
+			customCells = decodeCells( mapParam );
+			spawn = computeSpawnPosition( customCells );
+
+		} catch ( e ) {
+
+			console.warn( 'Invalid map parameter, using default track' );
+
+		}
+
+	}
+
+	return { customCells, spawn, mapParam };
+
+}
+
+// --- Singleplayer init (unchanged from original) -------------------------
+
+function initSingleplayer( customCells, spawn ) {
+
+	const { bounds, groundSize } = setupScene( customCells );
+	const world = setupPhysics( bounds, groundSize, customCells );
+
 	const sphereBody = createSphereBody( world, spawn ? spawn.position : null );
 
 	const vehicle = new Vehicle();
@@ -184,7 +209,6 @@ async function init() {
 
 	}
 
-	// const vehicleGroup = vehicle.init( models[ 'vehicle-truck-yellow' ] );
 	const vehicleGroup = vehicle.init( models[ 'vehicle-toyota_bz4x' ] );
 	scene.add( vehicleGroup );
 
@@ -265,6 +289,308 @@ async function init() {
 	}
 
 	animate();
+
+}
+
+// --- Multiplayer init ----------------------------------------------------
+
+const STATE_SEND_INTERVAL = 1 / 20; // 20 Hz
+
+function initMultiplayer( network, isHost, playerList, customCells ) {
+
+	const { bounds, groundSize } = setupScene( customCells );
+	const world = setupPhysics( bounds, groundSize, customCells );
+
+	const playerManager = new PlayerManager( scene, world, models );
+
+	// Compute spawn positions for all players
+	const spawns = computeSpawnPositions( customCells, playerList.length );
+
+	for ( let i = 0; i < playerList.length; i ++ ) {
+
+		const pid = playerList[ i ];
+		const sp = spawns[ i ] || spawns[ 0 ];
+		playerManager.addPlayer( pid, sp.position, sp.angle );
+
+	}
+
+	// Local player reference
+	const localId = network.localId;
+	const localEntry = playerManager.getPlayer( localId );
+	const localVehicle = localEntry.vehicle;
+
+	dirLight.target = localVehicle.container;
+
+	const cam = new Camera();
+	cam.targetPosition.copy( localVehicle.spherePos );
+
+	const controls = new Controls();
+
+	const particles = new SmokeTrails( scene );
+
+	const audio = new GameAudio();
+	audio.init( cam.camera );
+
+	const boxWall = new BoxWall( scene, world, customCells );
+	const speedBoat = new SpeedBoat( scene, world, customCells, models[ 'speed_boat_03' ] );
+	const powerups = new Powerups( scene, world, localVehicle, customCells );
+	powerups.boxWall = boxWall;
+	powerups.speedBoat = speedBoat;
+	powerups.playerManager = playerManager;
+	powerups.localPlayerId = localId;
+	powerups.isHost = isHost;
+	powerups.network = network;
+
+	// Clients don't auto-spawn obstacles
+	if ( ! isHost ) {
+
+		boxWall.disableAutoSpawn = true;
+		speedBoat.disableAutoSpawn = true;
+
+	}
+
+	// Multiplayer HUD
+	const hudContainer = Lobby.createGameHUD();
+
+	const _forward = new THREE.Vector3();
+
+	// --- Contact listener ------------------------------------------------
+
+	const contactListener = {
+		onContactAdded( bodyA, bodyB ) {
+
+			// Vehicle impacts (audio) — only for local player
+			if ( bodyA === localEntry.sphereBody || bodyB === localEntry.sphereBody ) {
+
+				_forward.set( 0, 0, 1 ).applyQuaternion( localVehicle.container.quaternion );
+				_forward.y = 0;
+				_forward.normalize();
+
+				const impactVelocity = Math.abs( localVehicle.modelVelocity.dot( _forward ) );
+				audio.playImpact( impactVelocity );
+
+			}
+
+			// Speedboat explosion
+			speedBoat.onContact( bodyA, bodyB );
+
+			// Powerup projectile impacts (includes player vehicle targeting)
+			powerups.onContact( bodyA, bodyB );
+
+		}
+	};
+
+	// --- Network callbacks -----------------------------------------------
+
+	let stateSendTimer = 0;
+
+	if ( isHost ) {
+
+		// Host: receive input from clients
+		network.onInputReceived = ( playerId, input ) => {
+
+			playerManager.setInput( playerId, input );
+
+		};
+
+		// Host: player disconnects
+		network.onPlayerLeft = ( playerId ) => {
+
+			playerManager.removePlayer( playerId );
+
+		};
+
+	} else {
+
+		// Client: receive authoritative state from host
+		network.onStateReceived = ( state ) => {
+
+			playerManager.applyState( state );
+
+		};
+
+		// Client: player destroyed
+		network.onPlayerDestroyed = ( playerId ) => {
+
+			playerManager.destroyPlayer( playerId );
+
+		};
+
+		// Client: player respawned
+		network.onPlayerRespawned = ( playerId ) => {
+
+			playerManager.respawnPlayer( playerId );
+
+		};
+
+		// Client: new player joined mid-game
+		network.onPlayerJoined = ( playerId ) => {
+
+			if ( ! playerManager.getPlayer( playerId ) ) {
+
+				const count = playerManager.playerOrder.length + 1;
+				const spawns = computeSpawnPositions( customCells, count );
+				const sp = spawns[ spawns.length - 1 ] || spawns[ 0 ];
+				playerManager.addPlayer( playerId, sp.position, sp.angle );
+
+			}
+
+		};
+
+		// Client: player left mid-game
+		network.onPlayerLeft = ( playerId ) => {
+
+			playerManager.removePlayer( playerId );
+
+		};
+
+	}
+
+	// --- Game loop -------------------------------------------------------
+
+	const timer = new THREE.Timer();
+
+	function animate() {
+
+		requestAnimationFrame( animate );
+
+		timer.update();
+		const dt = Math.min( timer.getDelta(), 1 / 30 );
+
+		// Read local input
+		const input = controls.update();
+
+		if ( isHost ) {
+
+			// Host: apply local input and step physics
+			playerManager.setInput( localId, input );
+
+			updateWorld( world, contactListener, dt );
+
+			playerManager.update( dt );
+
+			// Check for respawns
+			const respawned = playerManager.checkRespawns();
+
+			for ( const pid of respawned ) {
+
+				playerManager.respawnPlayer( pid );
+				network.sendPlayerRespawned( pid );
+
+			}
+
+			// Broadcast state at ~20 Hz
+			stateSendTimer += dt;
+
+			if ( stateSendTimer >= STATE_SEND_INTERVAL ) {
+
+				stateSendTimer = 0;
+				network.sendState( playerManager.buildState() );
+
+			}
+
+			// Update powerups using multiplayer path
+			powerups.updateMultiplayer( dt );
+
+		} else {
+
+			// Client: send input to host
+			network.sendInput( input );
+
+			// Client still steps physics locally for responsive feel
+			// but state is overridden by host broadcasts
+			playerManager.setInput( localId, input );
+
+			updateWorld( world, contactListener, dt );
+
+			playerManager.update( dt );
+
+			// Client uses singleplayer powerup path for local visuals
+			powerups.updateMultiplayer( dt );
+
+		}
+
+		// Update local camera to follow local vehicle
+		dirLight.position.set(
+			localVehicle.spherePos.x + 11.4,
+			15,
+			localVehicle.spherePos.z - 5.3
+		);
+
+		cam.update( dt, localVehicle.spherePos );
+		particles.update( dt, playerManager.getAliveVehicles() );
+		audio.update( dt, localVehicle.linearSpeed, input.z, localVehicle.driftIntensity );
+		boxWall.update( dt );
+		speedBoat.update( dt );
+
+		// Update HUD
+		Lobby.updateGameHUD( hudContainer, playerManager.getHUDData() );
+
+		renderer.render( scene, cam.camera );
+
+	}
+
+	animate();
+
+}
+
+// --- Entry point ---------------------------------------------------------
+
+async function init() {
+
+	registerAll();
+	await loadModels();
+
+	const { customCells, spawn, mapParam } = parseMapParam();
+
+	const network = new Network();
+	const lobby = new Lobby();
+
+	const result = await lobby.show( network );
+
+	if ( result.mode === 'singleplayer' ) {
+
+		initSingleplayer( customCells, spawn );
+
+	} else {
+
+		// Multiplayer
+		const isHost = result.isHost;
+		let playerList;
+		let mpCells = customCells;
+
+		if ( isHost ) {
+
+			// Host already has the player list from startGame
+			playerList = network.getPlayerIds();
+
+		} else {
+
+			// Client received gameData from GAME_START
+			playerList = result.gameData.players;
+
+			// Use the host's map parameter if available
+			const hostMapParam = result.gameData.mapParam;
+
+			if ( hostMapParam ) {
+
+				try {
+
+					mpCells = decodeCells( hostMapParam );
+
+				} catch ( e ) {
+
+					console.warn( 'Invalid host map parameter, using local track' );
+
+				}
+
+			}
+
+		}
+
+		initMultiplayer( network, isHost, playerList, mpCells );
+
+	}
 
 }
 

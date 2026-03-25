@@ -405,6 +405,8 @@ export function decodeCells( str ) {
 
 export function computeSpawnPosition( cells ) {
 
+	if ( ! cells || cells.length === 0 ) return { position: [ 3.5, 0.5, 5 ], angle: 0 };
+
 	let cell = cells[ 0 ];
 
 	for ( const c of cells ) {
@@ -475,5 +477,50 @@ function base64urlToBytes( str ) {
 	for ( let i = 0; i < binary.length; i ++ ) bytes[ i ] = binary.charCodeAt( i );
 
 	return bytes;
+
+}
+
+// --- Multi-spawn positions for multiplayer --------------------------------
+
+export function computeSpawnPositions( cells, count ) {
+
+	const base = computeSpawnPosition( cells );
+	if ( count <= 1 ) return [ base ];
+
+	const angle = base.angle;
+	const [ bx, by, bz ] = base.position;
+
+	// Perpendicular offset direction (left/right of road direction)
+	const perpX = Math.cos( angle + Math.PI / 2 );
+	const perpZ = Math.sin( angle + Math.PI / 2 );
+
+	// Along-road offset direction (front/back)
+	const alongX = Math.cos( angle );
+	const alongZ = Math.sin( angle );
+
+	// 2x2 grid layout: offset sideways +/- 1.2, along +/- 1.2
+	const offsets = [
+		[ - 1.2, 1.2 ],
+		[ 1.2, 1.2 ],
+		[ - 1.2, - 1.2 ],
+		[ 1.2, - 1.2 ],
+	];
+
+	const positions = [];
+
+	for ( let i = 0; i < count && i < offsets.length; i ++ ) {
+
+		const [ side, fwd ] = offsets[ i ];
+		const x = bx + perpX * side + alongX * fwd;
+		const z = bz + perpZ * side + alongZ * fwd;
+
+		positions.push( {
+			position: [ x, by, z ],
+			angle,
+		} );
+
+	}
+
+	return positions;
 
 }

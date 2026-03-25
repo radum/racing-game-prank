@@ -35,6 +35,8 @@ export class Vehicle {
 
 		this.rigidBody = null;
 		this.physicsWorld = null;
+		this.spawnPosition = null;
+		this.spawnAngle = 0;
 
 		this.modelVelocity = new THREE.Vector3();
 		this.prevModelPos = new THREE.Vector3( 3.5, 0, 5 );
@@ -187,21 +189,24 @@ export class Vehicle {
 
 		if ( this.spherePos.y < - 10 ) {
 
+			const sp = this.spawnPosition || [ 3.5, 0.5, 5 ];
+			const sa = this.spawnAngle || 0;
+
 			if ( this.rigidBody ) {
 
-				rigidBody.setPosition( this.physicsWorld, this.rigidBody, [ 3.5, 0.5, 5 ], false );
+				rigidBody.setPosition( this.physicsWorld, this.rigidBody, sp, false );
 				rigidBody.setLinearVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
 				rigidBody.setAngularVelocity( this.physicsWorld, this.rigidBody, [ 0, 0, 0 ] );
 
 			}
 
-			this.spherePos.set( 3.5, 0.5, 5 );
+			this.spherePos.set( sp[ 0 ], sp[ 1 ], sp[ 2 ] );
 			this.sphereVel.set( 0, 0, 0 );
 			this.linearSpeed = 0;
 			this.angularSpeed = 0;
 			this.acceleration = 0;
-			this.container.rotation.set( 0, 0, 0 );
-			this.container.quaternion.identity();
+			this.container.rotation.set( 0, sa, 0 );
+			this.container.quaternion.setFromEuler( this.container.rotation );
 
 		}
 

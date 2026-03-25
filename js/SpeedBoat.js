@@ -20,17 +20,24 @@ export class SpeedBoat {
 		this.boat = null;
 		this.explosion = null;
 
+		// When true, no auto-spawning (client mode in multiplayer)
+		this.disableAutoSpawn = false;
+
 	}
 
 	update( dt ) {
 
-		this.spawnTimer -= dt;
+		if ( ! this.disableAutoSpawn ) {
 
-		if ( this.spawnTimer <= 0 ) {
+			this.spawnTimer -= dt;
 
-			this.spawnTimer = SPAWN_INTERVAL;
+			if ( this.spawnTimer <= 0 ) {
 
-			if ( ! this.boat && ! this.explosion ) this.spawn();
+				this.spawnTimer = SPAWN_INTERVAL;
+
+				if ( ! this.boat && ! this.explosion ) this.spawn();
+
+			}
 
 		}
 

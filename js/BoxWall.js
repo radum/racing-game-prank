@@ -91,6 +91,9 @@ export class BoxWall {
 		this.walls = [];
 		this.spawnTimer = SPAWN_INTERVAL;
 
+		// When true, no auto-spawning (client mode in multiplayer)
+		this.disableAutoSpawn = false;
+
 		// Shared materials for boxes
 		this.boxMaterials = _colors.map( ( color ) =>
 			new THREE.MeshStandardMaterial( { color, roughness: 0.6, metalness: 0.1 } )
@@ -100,15 +103,19 @@ export class BoxWall {
 
 	update( dt ) {
 
-		this.spawnTimer -= dt;
+		if ( ! this.disableAutoSpawn ) {
 
-		if ( this.spawnTimer <= 0 ) {
+			this.spawnTimer -= dt;
 
-			this.spawnTimer = SPAWN_INTERVAL;
+			if ( this.spawnTimer <= 0 ) {
 
-			// Only spawn if fewer than MAX_WALLS unhit walls on the track
-			const activeCount = this.walls.filter( ( w ) => ! w.hit ).length;
-			if ( activeCount < MAX_WALLS ) this.spawnWall();
+				this.spawnTimer = SPAWN_INTERVAL;
+
+				// Only spawn if fewer than MAX_WALLS unhit walls on the track
+				const activeCount = this.walls.filter( ( w ) => ! w.hit ).length;
+				if ( activeCount < MAX_WALLS ) this.spawnWall();
+
+			}
 
 		}
 
