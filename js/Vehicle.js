@@ -58,6 +58,11 @@ export class Vehicle {
 
 		const vehicleModel = model.clone();
 
+		// Shift model so the bottom of its bounding box sits at y = 0
+		const bbox = new THREE.Box3().setFromObject( vehicleModel );
+		vehicleModel.position.y = - bbox.min.y;
+		vehicleModel.rotation.y = Math.PI;
+
 		this.container.add( vehicleModel );
 
 		// Find body and wheel nodes
@@ -70,15 +75,25 @@ export class Vehicle {
 				child.rotation.order = 'YXZ';
 				this.bodyNode = child;
 
-			} else if ( name.includes( 'wheel' ) ) {
+			// This is for the yellow car
+			// } else if ( name.includes( 'wheel' ) ) {
+			// This is for bz4x
+			} else if ( name.includes( 'wheel_lfchild' ) && !name.includes( 'tire' ) && !name.includes( 'velg' ) && !name.includes( 'disc' ) && !name.includes( 'black' ) ) {
 
 				child.rotation.order = 'YXZ';
 				this.wheels.push( child );
 
-				if ( name.includes( 'front' ) && name.includes( 'left' ) ) this.wheelFL = child;
-				if ( name.includes( 'front' ) && name.includes( 'right' ) ) this.wheelFR = child;
-				if ( name.includes( 'back' ) && name.includes( 'left' ) ) this.wheelBL = child;
-				if ( name.includes( 'back' ) && name.includes( 'right' ) ) this.wheelBR = child;
+				// These are for the yellow car
+				// if ( name.includes( 'front' ) && name.includes( 'left' ) ) this.wheelFL = child;
+				// if ( name.includes( 'front' ) && name.includes( 'right' ) ) this.wheelFR = child;
+				// if ( name.includes( 'back' ) && name.includes( 'left' ) ) this.wheelBL = child;
+				// if ( name.includes( 'back' ) && name.includes( 'right' ) ) this.wheelBR = child;
+
+				// These are for bz4x
+				if ( name === 'wheel_lfchild003' ) this.wheelFL = child;
+				if ( name === 'wheel_lfchild' ) this.wheelFR = child;
+				if ( name === 'wheel_lfchild002' ) this.wheelBL = child;
+				if ( name === 'wheel_lfchild001' ) this.wheelBR = child;
 
 			}
 
@@ -246,7 +261,10 @@ export class Vehicle {
 
 		for ( const wheel of this.wheels ) {
 
-			wheel.rotation.x += this.acceleration;
+			// This is for the yellow car
+			// wheel.rotation.x += this.acceleration;
+			// This is for bz4x
+			wheel.rotation.x -= this.acceleration;
 
 		}
 

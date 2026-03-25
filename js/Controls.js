@@ -5,11 +5,14 @@ export class Controls {
 		this.keys = {};
 		this.x = 0;
 		this.z = 0;
+		this.fire = false;
+		this.firePressed = false;
 
 		// Touch state
 		this.touchSteer = 0;
 		this.touchGas = false;
 		this.touchBrake = false;
+		this.touchFire = false;
 		this.steerPointerId = null;
 		this.steerStartX = 0;
 
@@ -36,6 +39,8 @@ export class Controls {
 			.touch-btn.gas.active { background: rgba(80,180,80,0.5); border-color: rgba(80,180,80,0.6); }
 			.touch-btn.brake { background: rgba(200,80,80,0.25); right: 80px; bottom: 0; }
 			.touch-btn.brake.active { background: rgba(200,80,80,0.5); border-color: rgba(200,80,80,0.6); }
+			.touch-btn.fire { background: rgba(220,160,40,0.25); right: 0; bottom: 0; }
+			.touch-btn.fire.active { background: rgba(220,160,40,0.5); border-color: rgba(220,160,40,0.6); }
 		`;
 		document.head.appendChild( css );
 
@@ -66,8 +71,13 @@ export class Controls {
 		brakeBtn.className = 'touch-btn brake';
 		brakeBtn.textContent = 'BRK';
 
+		const fireBtn = document.createElement( 'div' );
+		fireBtn.className = 'touch-btn fire';
+		fireBtn.textContent = 'FIRE';
+
 		btnZone.appendChild( gasBtn );
 		btnZone.appendChild( brakeBtn );
+		btnZone.appendChild( fireBtn );
 
 		container.appendChild( steerZone );
 		container.appendChild( btnZone );
@@ -145,11 +155,30 @@ export class Controls {
 		brakeBtn.addEventListener( 'pointerup', endBrake );
 		brakeBtn.addEventListener( 'pointercancel', endBrake );
 
+		// Fire button
+		fireBtn.addEventListener( 'pointerdown', ( e ) => {
+
+			fireBtn.setPointerCapture( e.pointerId );
+			this.touchFire = true;
+			fireBtn.classList.add( 'active' );
+
+		} );
+
+		const endFire = () => {
+
+			this.touchFire = false;
+			fireBtn.classList.remove( 'active' );
+
+		};
+
+		fireBtn.addEventListener( 'pointerup', endFire );
+		fireBtn.addEventListener( 'pointercancel', endFire );
+
 	}
 
 	update() {
 
-		let x = 0, z = 0;
+		let x = 0, z = 0, fire = false;
 
 		// Keyboard
 
@@ -157,6 +186,7 @@ export class Controls {
 		if ( this.keys[ 'KeyD' ] || this.keys[ 'ArrowRight' ] ) x += 1;
 		if ( this.keys[ 'KeyW' ] || this.keys[ 'ArrowUp' ] ) z += 1;
 		if ( this.keys[ 'KeyS' ] || this.keys[ 'ArrowDown' ] ) z -= 1;
+		if ( this.keys[ 'Space' ] ) fire = true;
 
 		// Gamepad
 
@@ -174,6 +204,9 @@ export class Controls {
 
 			if ( rt > 0.1 || lt > 0.1 ) z = rt - lt;
 
+			// A button (index 0) to fire
+			if ( gp.buttons[ 0 ] && gp.buttons[ 0 ].pressed ) fire = true;
+
 			break;
 
 		}
@@ -183,11 +216,16 @@ export class Controls {
 		if ( this.touchSteer !== 0 ) x = this.touchSteer;
 		if ( this.touchGas ) z = 1;
 		if ( this.touchBrake ) z = - 1;
+		if ( this.touchFire ) fire = true;
 
 		this.x = x;
 		this.z = z;
 
-		return { x, z };
+		// Edge detection: firePressed is true only on the frame fire becomes true
+		this.firePressed = fire && ! this.fire;
+		this.fire = fire;
+
+		return { x, z, fire: this.firePressed };
 
 	}
 

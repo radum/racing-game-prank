@@ -9,6 +9,9 @@ import { buildTrack, decodeCells, computeSpawnPosition, computeTrackBounds } fro
 import { buildWallColliders, createSphereBody } from './Physics.js';
 import { SmokeTrails } from './Particles.js';
 import { GameAudio } from './Audio.js';
+import { BoxWall } from './BoxWall.js';
+import { SpeedBoat } from './SpeedBoat.js';
+import { Powerups } from './Powerups.js';
 
 
 const renderer = new THREE.WebGLRenderer( { antialias: true, outputBufferType: THREE.HalfFloatType } );
@@ -54,6 +57,8 @@ const modelNames = [
 	'vehicle-truck-yellow', 'vehicle-truck-green', 'vehicle-truck-purple', 'vehicle-truck-red',
 	'track-straight', 'track-corner', 'track-bump', 'track-finish',
 	'decoration-empty', 'decoration-forest', 'decoration-tents',
+	'speed_boat_03',
+	'vehicle-toyota_bz4x'
 ];
 
 const models = {};
@@ -78,7 +83,7 @@ async function loadModels() {
 				// Godot imports vehicle models at root_scale=0.5
 				if ( name.startsWith( 'vehicle-' ) ) {
 
-					gltf.scene.scale.setScalar( 0.5 );
+					gltf.scene.scale.setScalar( 0.35 );
 
 				}
 
@@ -179,7 +184,8 @@ async function init() {
 
 	}
 
-	const vehicleGroup = vehicle.init( models[ 'vehicle-truck-yellow' ] );
+	// const vehicleGroup = vehicle.init( models[ 'vehicle-truck-yellow' ] );
+	const vehicleGroup = vehicle.init( models[ 'vehicle-toyota_bz4x' ] );
 	scene.add( vehicleGroup );
 
 	dirLight.target = vehicleGroup;
@@ -194,19 +200,33 @@ async function init() {
 	const audio = new GameAudio();
 	audio.init( cam.camera );
 
+	const boxWall = new BoxWall( scene, world, customCells );
+	const speedBoat = new SpeedBoat( scene, world, customCells, models[ 'speed_boat_03' ] );
+	const powerups = new Powerups( scene, world, vehicle, customCells );
+	powerups.boxWall = boxWall;
+	powerups.speedBoat = speedBoat;
+
 	const _forward = new THREE.Vector3();
 
 	const contactListener = {
 		onContactAdded( bodyA, bodyB ) {
 
-			if ( bodyA !== sphereBody && bodyB !== sphereBody ) return;
+			// Vehicle impacts (audio + speedboat explosion)
+			if ( bodyA === sphereBody || bodyB === sphereBody ) {
 
-			_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
-			_forward.y = 0;
-			_forward.normalize();
+				_forward.set( 0, 0, 1 ).applyQuaternion( vehicle.container.quaternion );
+				_forward.y = 0;
+				_forward.normalize();
 
-			const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
-			audio.playImpact( impactVelocity );
+				const impactVelocity = Math.abs( vehicle.modelVelocity.dot( _forward ) );
+				audio.playImpact( impactVelocity );
+
+				speedBoat.onContact( bodyA, bodyB );
+
+			}
+
+			// Powerup projectile impacts
+			powerups.onContact( bodyA, bodyB );
 
 		}
 	};
@@ -235,6 +255,9 @@ async function init() {
 		cam.update( dt, vehicle.spherePos );
 		particles.update( dt, vehicle );
 		audio.update( dt, vehicle.linearSpeed, input.z, vehicle.driftIntensity );
+		boxWall.update( dt );
+		speedBoat.update( dt );
+		powerups.update( dt, vehicle, input );
 
 		renderer.render( scene, cam.camera );
 
