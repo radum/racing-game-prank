@@ -12,14 +12,19 @@ const REMOVE_DELAY = 10;
 const MAX_WALLS = 5;
 
 const MESSAGES = [
-	'CAUTION!',
-	'SLOW DOWN!',
-	'WATCH OUT!',
-	'DANGER!',
-	'YIKES!',
-	'OOPS!',
-	'CRASH!',
-	'BOOM!',
+	'Is just a POC',
+	'LEGAL everywhere',
+	'Leticia',
+	'Michel',
+	'Rockar',
+	'Tooltip everything',
+	'Senior change request manager',
+	'Paco',
+	'This is a prank',
+	'The wheels were coming off',
+	'It works on my machine',
+	'TODO Driven Development',
+	'Mock Driven Development',
 ];
 
 const _boxGeo = new THREE.BoxGeometry( BOX_SIZE, BOX_SIZE, BOX_SIZE );
