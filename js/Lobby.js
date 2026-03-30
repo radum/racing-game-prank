@@ -92,8 +92,15 @@ const LOBBY_CSS = `
 		font-size: 14px;
 		opacity: 0.4;
 	}
-	.lobby-name-input {
+	.lobby-name-row {
+		display: flex;
+		gap: 8px;
 		width: 100%;
+		margin-bottom: 16px;
+	}
+	.lobby-name-input {
+		flex: 1;
+		min-width: 0;
 		padding: 12px;
 		border: 2px solid #444;
 		border-radius: 10px;
@@ -102,13 +109,26 @@ const LOBBY_CSS = `
 		font-size: 16px;
 		font-weight: 600;
 		text-align: center;
-		margin-bottom: 16px;
 		box-sizing: border-box;
 		outline: none;
 		letter-spacing: normal;
 		text-transform: none;
 	}
 	.lobby-name-input:focus { border-color: #4488ff; }
+	.lobby-name-random {
+		padding: 0 14px;
+		border: 2px solid #444;
+		border-radius: 10px;
+		background: #0f0f23;
+		color: #fff;
+		font-size: 20px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: border-color 0.15s, background 0.15s;
+	}
+	.lobby-name-random:hover { border-color: #4488ff; background: #1a1a3a; }
 	.lobby-name-input::placeholder {
 		font-size: 14px;
 		opacity: 0.4;
@@ -268,13 +288,22 @@ export class Lobby {
 			<div class="lobby-title">Beyond Zero Racing</div>
 			<div class="lobby-subtitle">Multiplayer Arena</div>
 			<div class="lobby-name-label">Your Name</div>
-			<input class="lobby-name-input" id="lobby-name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" spellcheck="false" value="${ this._escapeHtml( this._localName ) }">
+			<div class="lobby-name-row">
+				<input class="lobby-name-input" id="lobby-name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" spellcheck="false" value="${ this._escapeHtml( this._localName ) }">
+				<button class="lobby-name-random" id="lobby-random-name" title="Random name">&#x1f3b2;</button>
+			</div>
 			<button class="lobby-btn lobby-btn-primary" id="lobby-host">Host Game</button>
 			<button class="lobby-btn lobby-btn-secondary" id="lobby-join">Join Game</button>
 			<button class="lobby-btn lobby-btn-solo" id="lobby-solo">Play Solo</button>
 		`;
 
 		const nameInput = panel.querySelector( '#lobby-name' );
+
+		panel.querySelector( '#lobby-random-name' ).onclick = () => {
+
+			nameInput.value = PLAYER_NAMES[ Math.floor( Math.random() * PLAYER_NAMES.length ) ];
+
+		};
 
 		const readName = () => {
 
