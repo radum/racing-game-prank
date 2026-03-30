@@ -432,9 +432,22 @@ export class PlayerManager {
 		ctx.fill();
 
 		ctx.fillStyle = color;
-		ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
+
+		// Shrink font until the text fits within the padded area
+		const maxWidth = 236;
+		let fontSize = 28;
+
+		ctx.font = 'bold ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+
+		while ( ctx.measureText( name ).width > maxWidth && fontSize > 12 ) {
+
+			fontSize -= 2;
+			ctx.font = 'bold ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+
+		}
+
 		ctx.fillText( name, 128, 32 );
 
 		const texture = new THREE.CanvasTexture( canvas );
