@@ -3,10 +3,10 @@
 // list, and start game button. Returns a promise that resolves with the
 // chosen mode and network details.
 
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 10;
 
-const PLAYER_COLORS = [ '#ff4444', '#44aaff', '#44cc44', '#ffaa00' ];
-const PLAYER_NAMES = [ 'Player 1', 'Player 2', 'Player 3', 'Player 4' ];
+const PLAYER_COLORS = [ '#ff4444', '#44aaff', '#44cc44', '#ffaa00', '#ff44ff', '#44ffff', '#ffff44', '#ff8844', '#4488ff', '#44ff88' ];
+const PLAYER_NAMES = [ 'Hackerman', 'Yo-Han Van Da Field', 'Liam Sass-on', 'Sonya Err-Vin', 'Letty Bongy-Oh-Vanny', 'Omar Origami', 'Wim de Booster', 'Mike Half-Man', 'Ray-Moan Mandoodle', 'I. Van Kha-Libre-O' ];
 
 // --- CSS -----------------------------------------------------------------
 

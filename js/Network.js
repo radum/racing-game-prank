@@ -6,7 +6,7 @@
 import Peer from 'peerjs';
 
 const ROOM_PREFIX = 'bzr-';
-const MAX_PLAYERS = 4;
+const MAX_PLAYERS = 10;
 const STATE_SEND_RATE = 50; // ms between host state broadcasts (~20 Hz)
 
 // --- Message types -------------------------------------------------------
